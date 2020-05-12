@@ -93,6 +93,15 @@ app.get("/results", function(req, res) {
   });
 });
 
+
+app.get("/results/analysis", function(req, res) {
+  var db = getDBAdapter(req);
+  var postId = req.query["postId"];
+  db.analyzeResults(postId, function(result) {
+    sendJsonResult(res, result);
+  });
+});
+
 app.use(express.static(__dirname + "/public"));
 
 app.listen(process.env.PORT || 3000, function() {

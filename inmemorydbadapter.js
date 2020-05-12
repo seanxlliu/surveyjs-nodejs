@@ -111,19 +111,88 @@ function InMemoryDBAdapter(session) {
     });
   }
 
+  function getSurvey(surveyId, callback) {
+    getSurveys(function(result) {
+      callback(JSON.parse(result[surveyId].json));
+    });
+  }
+
+  function elementToColumn(element) {
+    const otherTypes = ['checkbox', 'multipletext'];
+    const kvTypes = ['dropdown', 'radiogroup'];
+    const strTypes = ['comment', 'text'];
+    const intTypes = ['rating', 'boolean'];
+
+    if (otherTypes.includes(element.type)) {
+      return element;
+    } else if (kvTypes.includes(element.type)) {
+      return { type: 'kv', name: element.name, choices: element.choices };
+    } else if (strTypes.includes(element.type)) {
+      return { type: 'str', name: element.name };
+    } else if (intTypes.includes(element.type)) {
+      return { type: 'int', name: element.name };
+    } else {
+      console.log('Element type is not handled', element)
+      return { type: 'str', name: element.name, orgtype: element.type };
+    }
+  }
+
+  function resultToRow(result, columns) {
+    let row = {};
+    const converts = {
+      checkbox: (column, answer) => column.choices.forEach( c => row[`${column.name}_${c.text || c}`] = answer && answer.includes(c.value || c) ? 1 : 0 ),
+      multipletext: (column, answer) => column.items.forEach( i => row[`${column.name}_${i.name}`] = answer ? answer[i.name] : ''),
+      kv: (column, answer) => column.choices.forEach( c => row[`${column.name}_${c.text || c}`] = answer && answer == (c.value || c) ? 1 : 0),
+      int: (column, answer) => row[column.name] = answer ? Number(answer) : 0,
+      str: (column, answer) => row[column.name] = answer || ''
+    }
+
+    for (const name in columns) {
+      if (columns.hasOwnProperty(name)) {
+        const column = columns[name];
+        converts[column.type](column, result[name]);
+      }
+    }
+    return row;
+  }
+
+  function analyzeResults(surveyId, callback) {
+    getSurvey(surveyId, survey => {
+      getResults(surveyId, results => {
+        try {
+          let columns = {};
+          if (survey && survey.pages && Array.isArray(survey.pages)) {
+            columns = survey.pages.reduce((cs, page) => {
+              if (page.elements && page.elements.length > 0) {
+                page.elements.forEach(e => { cs[e.name] = elementToColumn(e); })
+              }
+              return cs;
+            }, {});
+          }
+          console.log('create table from', columns);
+
+          let rows = results.map(r => resultToRow(JSON.parse(r), columns));
+          console.log('create data from', rows);
+        } catch(e) {
+          console.log('Failed to build results.', e);
+          console.log(survey);
+          console.log(results);
+        }
+        callback();
+      })
+    })
+  }
+
   return {
     addSurvey: addSurvey,
-    getSurvey: function(surveyId, callback) {
-      getSurveys(function(result) {
-        callback(JSON.parse(result[surveyId].json));
-      });
-    },
+    getSurvey: getSurvey,
     storeSurvey: storeSurvey,
     getSurveys: getSurveys,
     deleteSurvey: deleteSurvey,
     postResults: postResults,
     getResults: getResults,
-    changeName: changeName
+    changeName: changeName,
+    analyzeResults: analyzeResults
   };
 }
 
