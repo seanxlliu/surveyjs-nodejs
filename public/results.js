@@ -82,3 +82,36 @@ function SurveyManager(baseUrl, accessKey) {
 }
 
 ko.applyBindings(new SurveyManager(""), document.body);
+
+var ofile = 'results.xlsx';
+
+function doit(dl) { 
+  var elt = document.getElementById('resultsTable');
+  var wb = XLSX.utils.table_to_book(elt, {sheet:"Sheet JS"});
+  
+  return dl ?
+    XLSX.write(wb, {bookType: 'xlsx', bookSST:true, type: 'base64'}) :
+    XLSX.writeFile(wb, ofile);
+}
+
+function tableau() {
+  if (typeof Downloadify !== 'undefined') {
+    Downloadify.create('flashver', {
+      swf: 'downloadify.swf',
+      downloadImage: 'download.png',
+      width: 100,
+      height: 30,
+      filename: ofile, data: function () { return doit(true); },
+      transparent: false,
+      append: false,
+      dataType: 'base64',
+      onComplete: function () { alert('Your File Has Been Saved!'); },
+      onCancel: function () { alert('You have cancelled the saving of this file.'); },
+      onError: function () { alert('You must put something in the File Contents or there will be nothing to save!'); }
+    });
+  } else { 
+    document.getElementById('flashver').innerHTML = "";
+  }
+}
+
+tableau();
